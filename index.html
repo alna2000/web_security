@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Security Communication Visualizer</title>
+    <style>
+        /* CSS Variables for theming */
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --success-color: #22c55e;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 10px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: var(--surface);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px var(--shadow);
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            color: var(--primary-color);
+            margin-bottom: 5px;
+            font-size: 1.8rem;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-rows: 1fr 240px;
+            gap: 10px;
+            flex: 1;
+            min-height: 0;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .info-panel {
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 6px var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .visualization-area {
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 6px var(--shadow);
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .network-diagram {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 120px;
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .browser, .server {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            position: relative;
+            font-size: 0.8rem;
+        }
+
+        .browser {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .server {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .connection-line {
+            position: absolute;
+            top: 50%;
+            left: 100px;
+            right: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 2px;
+            transform: translateY(-50%);
+        }
+
+        .packet {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--success-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            opacity: 0;
+            z-index: 10;
+        }
+
+        .packet.moving {
+            animation: movePacket 2s ease-in-out;
+        }
+
+        @keyframes movePacket {
+            0% { left: 100px; opacity: 1; }
+            50% { opacity: 1; }
+            100% { right: 100px; left: auto; opacity: 0; }
+        }
+
+        .step-info {
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .step-info h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .step-details {
+            flex-shrink: 0;
+            margin-bottom: 15px;
+        }
+
+        .step-details h4 {
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            font-size: 1rem;
+        }
+
+        .step-details p {
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .security-indicator {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .security-indicator.secure {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--success-color);
+        }
+
+        .security-indicator.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .security-indicator.danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .controls {
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 6px var(--shadow);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: var(--primary-color);
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .speed-control {
+            display: flex;
+            gap: 5px;
+        }
+
+        .speed-btn {
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .speed-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .step-timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .step-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .step-dot.completed {
+            background: var(--success-color);
+        }
+
+        .step-dot.current {
+            background: var(--primary-color);
+            transform: scale(1.2);
+        }
+
+        .technical-details {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(37, 99, 235, 0.05);
+            border-radius: 6px;
+            border-left: 3px solid var(--primary-color);
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .technical-details h4 {
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            overflow-x: auto;
+            margin-top: 8px;
+            line-height: 1.3;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                height: auto;
+                min-height: 100vh;
+            }
+
+            .main-layout {
+                grid-template-rows: 1fr auto;
+            }
+            
+            .network-diagram {
+                height: 120px;
+            }
+            
+            .browser, .server {
+                width: 80px;
+                height: 80px;
+                font-size: 0.8rem;
+            }
+
+            .visualization-area {
+                height: 220px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+                height: auto;
+            }
+            
+            .header h1 {
+                font-size: 1.6rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .control-group {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .visualization-area {
+                height: 200px;
+            }
+
+            .network-diagram {
+                height: 100px;
+            }
+        }
+
+        .certificate-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
+            z-index: 1000;
+            display: none;
+        }
+
+        .certificate-popup.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .overlay.show {
+            display: block;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .phase-indicator {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .phase-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            background: var(--primary-color);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔒 Web Security Communication Visualizer</h1>
+            <p>Interactive demonstration of browser-server communication with comprehensive security protocols</p>
+        </header>
+
+        <div class="main-layout">
+            <div class="info-panel">
+                <div class="step-info" id="step-info">
+                    <h3>Welcome to Web Security Visualizer</h3>
+                    <div class="step-content">
+                        <div class="step-details">
+                            <h4>Ready to Start</h4>
+                            <p>Click "Start Demo" to begin the comprehensive visualization of web communication security protocols.</p>
+                            <div class="security-indicator secure">
+                                <span>🔒 Educational Mode Active</span>
+                            </div>
+                        </div>
+                        <div class="technical-details">
+                            <h4>What You'll Learn</h4>
+                            <p>• Complete browser-server communication flow</p>
+                            <p>• Security protocols and their importance</p>
+                            <p>• Real-world attack prevention mechanisms</p>
+                            <p>• Performance and security trade-offs</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="visualization-area">
+                <div class="phase-indicator">
+                    <span class="phase-badge" id="phase-indicator">Phase 1: Initial Request</span>
+                </div>
+                
+                <div class="network-diagram">
+                    <div class="browser">
+                        <div>🌐</div>
+                        <div>Browser</div>
+                    </div>
+                    
+                    <div class="connection-line"></div>
+                    <div class="packet" id="packet">📦</div>
+                    
+                    <div class="server">
+                        <div>🖥️</div>
+                        <div>Server</div>
+                    </div>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+
+                <div class="step-timeline" id="step-timeline"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <button id="start-btn">▶️ Start Demo</button>
+                <button id="pause-btn" disabled>⏸️ Pause</button>
+                <button id="reset-btn">🔄 Reset</button>
+            </div>
+
+            <div class="control-group">
+                <button id="prev-btn" disabled>⏮️ Previous</button>
+                <button id="next-btn" disabled>⏭️ Next</button>
+            </div>
+
+            <div class="control-group">
+                <label>Speed:</label>
+                <div class="speed-control">
+                    <button class="speed-btn" data-speed="0.5">0.5x</button>
+                    <button class="speed-btn active" data-speed="1">1x</button>
+                    <button class="speed-btn" data-speed="2">2x</button>
+                    <button class="speed-btn" data-speed="5">5x</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="auto-mode" checked> Auto Mode
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificate Popup -->
+    <div class="overlay" id="overlay"></div>
+    <div class="certificate-popup" id="certificate-popup">
+        <button class="close-btn" id="close-popup">&times;</button>
+        <h3>SSL Certificate Details</h3>
+        <div class="code-block" id="certificate-content">
+Subject: CN=github.com, O=GitHub Inc., L=San Francisco, ST=California, C=US
+Issuer: CN=DigiCert TLS Hybrid ECC SHA384 2020 CA1, O=DigiCert Inc, C=US
+Valid From: March 25, 2024
+Valid To: March 25, 2025
+Serial Number: 0c:7b:8b:eb:d4:98:ad:c3:5e:09:7c:64:24:89:6d:8e
+Signature Algorithm: ecdsa-with-SHA384
+Public Key: ECC 256 bits
+        </div>
+    </div>
+
+    <script>
+        // Communication Steps Configuration
+        const communicationSteps = [
+            {
+                id: 1,
+                phase: 1,
+                title: "User Input",
+                description: "User types URL or clicks a link in the browser",
+                technical: "Browser receives user input and prepares to process the URL",
+                security: "secure",
+                details: "The browser validates the URL format and checks for potential malicious patterns.",
+                code: "Location: https://github.com/user/repo"
+            },
+            {
+                id: 2,
+                phase: 1,
+                title: "URL Parsing",
+                description: "Browser parses and validates the URL structure",
+                technical: "URL components are extracted: protocol, domain, path, query parameters",
+                security: "warning",
+                details: "Browser checks for URL validation and potential homograph attacks.",
+                code: "Protocol: https://\nDomain: github.com\nPath: /user/repo"
+            },
+            {
+                id: 3,
+                phase: 1,
+                title: "Browser Cache Check",
+                description: "Browser checks local cache for existing resources",
+                technical: "HTTP cache, DNS cache, and preload cache are consulted",
+                security: "secure",
+                details: "Cached resources reduce load time but must be validated for freshness.",
+                code: "Cache-Control: max-age=3600\nETag: \"33a64df551425fcc55e4d42a148795d9f25f89d4\""
+            },
+            {
+                id: 4,
+                phase: 1,
+                title: "DNS Resolution",
+                description: "Domain name is resolved to IP address",
+                technical: "DNS query sent to resolve github.com to IP address",
+                security: "warning",
+                details: "DNS queries can be intercepted or spoofed without proper security.",
+                code: "DNS Query: github.com A?\nDNS Response: 140.82.121.4"
+            },
+            {
+                id: 5,
+                phase: 1,
+                title: "DNSSEC Validation",
+                description: "DNS Security Extensions validate DNS response authenticity",
+                technical: "Cryptographic signatures verify DNS response integrity",
+                security: "secure",
+                details: "DNSSEC prevents DNS spoofing and cache poisoning attacks.",
+                code: "DNSSEC: RRSIG validated ✓\nTrust Chain: Root → .com → github.com"
+            },
+            {
+                id: 6,
+                phase: 2,
+                title: "TCP Connection",
+                description: "TCP three-way handshake establishes connection",
+                technical: "SYN, SYN-ACK, ACK packets establish reliable connection on port 443",
+                security: "warning",
+                details: "TCP connection is not encrypted and vulnerable to eavesdropping.",
+                code: "Client → Server: SYN\nServer → Client: SYN-ACK\nClient → Server: ACK"
+            },
+            {
+                id: 7,
+                phase: 2,
+                title: "TLS Handshake Initiation",
+                description: "Client Hello message starts TLS handshake",
+                technical: "Client sends supported cipher suites and TLS version",
+                security: "warning",
+                details: "Initial handshake reveals some client capabilities to potential attackers.",
+                code: "TLS Version: 1.3\nCipher Suites: TLS_AES_256_GCM_SHA384"
+            },
+            {
+                id: 8,
+                phase: 2,
+                title: "Server Certificate",
+                description: "Server presents SSL certificate for authentication",
+                technical: "X.509 certificate containing public key and identity information",
+                security: "warning",
+                details: "Certificate must be validated to prevent man-in-the-middle attacks.",
+                code: "Click to view certificate details",
+                popup: "certificate"
+            },
+            {
+                id: 9,
+                phase: 2,
+                title: "Certificate Validation",
+                description: "Browser validates certificate chain and revocation status",
+                technical: "Certificate authority chain validation and OCSP checking",
+                security: "secure",
+                details: "Multi-layer validation ensures certificate authenticity and current status.",
+                code: "CA Chain: DigiCert → GitHub Inc.\nOCSP Status: Good\nCRL Check: Valid"
+            },
+            {
+                id: 10,
+                phase: 2,
+                title: "Cipher Suite Negotiation",
+                description: "Client and server agree on encryption methods",
+                technical: "Strongest mutually supported cipher suite is selected",
+                security: "secure",
+                details: "Modern cipher suites provide forward secrecy and strong encryption.",
+                code: "Selected: TLS_AES_256_GCM_SHA384\nKey Exchange: X25519\nForward Secrecy: Yes"
+            },
+            {
+                id: 11,
+                phase: 2,
+                title: "Key Exchange",
+                description: "Cryptographic keys are generated and exchanged",
+                technical: "Ephemeral Diffie-Hellman key exchange provides forward secrecy",
+                security: "secure",
+                details: "Session keys are unique and temporary, enhancing security.",
+                code: "Key Exchange: ECDHE-RSA-AES256-GCM-SHA384\nSession Key: [Generated]\nForward Secrecy: Enabled"
+            },
+            {
+                id: 12,
+                phase: 2,
+                title: "Secure Channel Established",
+                description: "Encrypted communication tunnel is ready",
+                technical: "All subsequent data will be encrypted with session keys",
+                security: "secure",
+                details: "End-to-end encryption protects data confidentiality and integrity.",
+                code: "Encryption: AES-256-GCM\nAuthentication: HMAC-SHA384\nTunnel: Established ✓"
+            },
+            {
+                id: 13,
+                phase: 3,
+                title: "HSTS Check",
+                description: "HTTP Strict Transport Security enforcement",
+                technical: "Browser checks HSTS policy for forced HTTPS usage",
+                security: "secure",
+                details: "HSTS prevents protocol downgrade attacks and cookie hijacking.",
+                code: "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload"
+            },
+            {
+                id: 14,
+                phase: 3,
+                title: "Content Security Policy",
+                description: "CSP headers define allowed content sources",
+                technical: "Server sends CSP directives to prevent XSS attacks",
+                security: "secure",
+                details: "CSP acts as a second layer of defense against code injection attacks.",
+                code: "Content-Security-Policy: default-src 'self'; script-src 'self' github.githubassets.com"
+            },
+            {
+                id: 15,
+                phase: 3,
+                title: "CORS Validation",
+                description: "Cross-Origin Resource Sharing policy check",
+                technical: "Browser enforces same-origin policy with CORS exceptions",
+                security: "secure",
+                details: "CORS prevents unauthorized cross-origin requests while allowing legitimate ones.",
+                code: "Access-Control-Allow-Origin: https://github.com\nAccess-Control-Allow-Methods: GET, POST"
+            },
+            {
+                id: 16,
+                phase: 3,
+                title: "Cookie Security",
+                description: "Secure cookie handling and validation",
+                technical: "Cookies are validated for security attributes",
+                security: "secure",
+                details: "Secure, HttpOnly, and SameSite attributes protect against various attacks.",
+                code: "Set-Cookie: session_id=abc123; Secure; HttpOnly; SameSite=Strict"
+            },
+            {
+                id: 17,
+                phase: 3,
+                title: "Bot Detection",
+                description: "Anti-bot mechanisms analyze request patterns",
+                technical: "Server analyzes request headers and behavior patterns",
+                security: "secure",
+                details: "Bot detection prevents automated attacks and abuse.",
+                code: "User-Agent: Mozilla/5.0...\nBehavior Score: Human (95%)\nCAPTCHA: Not Required"
+            },
+            {
+                id: 18,
+                phase: 3,
+                title: "Rate Limiting",
+                description: "Request throttling prevents abuse",
+                technical: "Server enforces rate limits based on IP and user",
+                security: "secure",
+                details: "Rate limiting prevents DoS attacks and API abuse.",
+                code: "X-RateLimit-Limit: 60\nX-RateLimit-Remaining: 59\nX-RateLimit-Reset: 1640995200"
+            },
+            {
+                id: 19,
+                phase: 4,
+                title: "HTTP Request",
+                description: "Encrypted HTTP request sent to server",
+                technical: "GET request with security headers sent over TLS tunnel",
+                security: "secure",
+                details: "Request is fully encrypted and includes security headers.",
+                code: "GET /user/repo HTTP/1.1\nHost: github.com\nUser-Agent: Mozilla/5.0..."
+            },
+            {
+                id: 20,
+                phase: 4,
+                title: "Server Processing",
+                description: "Server processes request and queries database",
+                technical: "Application server handles request with security validations",
+                security: "secure",
+                details: "Server-side security validates all inputs and permissions.",
+                code: "Authentication: Validated\nAuthorization: Granted\nQuery: SELECT * FROM repos WHERE..."
+            },
+            {
+                id: 21,
+                phase: 4,
+                title: "Security Response Headers",
+                description: "Server includes comprehensive security headers",
+                technical: "Response contains headers for XSS, clickjacking, and other protections",
+                security: "secure",
+                details: "Multiple security headers provide defense in depth.",
+                code: "X-Frame-Options: DENY\nX-Content-Type-Options: nosniff\nReferrer-Policy: strict-origin"
+            },
+            {
+                id: 22,
+                phase: 4,
+                title: "Content Compression",
+                description: "Response content is compressed for efficiency",
+                technical: "Gzip or Brotli compression reduces bandwidth usage",
+                security: "secure",
+                details: "Compression is safe when properly implemented with modern algorithms.",
+                code: "Content-Encoding: br\nContent-Length: 1247\nCompression-Ratio: 78%"
+            },
+            {
+                id: 23,
+                phase: 4,
+                title: "Encrypted Content Delivery",
+                description: "Compressed content delivered over secure channel",
+                technical: "HTML, CSS, and JavaScript transmitted via TLS tunnel",
+                security: "secure",
+                details: "All content remains encrypted during transmission.",
+                code: "Content-Type: text/html; charset=utf-8\nTransfer-Encoding: chunked\nEncryption: AES-256-GCM"
+            },
+            {
+                id: 24,
+                phase: 5,
+                title: "HTML Parsing",
+                description: "Browser parses HTML and constructs DOM tree",
+                technical: "HTML parser builds Document Object Model for rendering",
+                security: "warning",
+                details: "Parser must handle potential XSS attempts in HTML content.",
+                code: "DOM Nodes: 1,247\nParsing Time: 12ms\nXSS Filter: Active"
+            },
+            {
+                id: 25,
+                phase: 5,
+                title: "CSS Processing",
+                description: "CSS rules processed and CSSOM constructed",
+                technical: "Style sheets parsed and render tree prepared",
+                security: "warning",
+                details: "CSS can potentially leak information or cause UI redress attacks.",
+                code: "Stylesheets: 3\nCSS Rules: 2,891\nCSS-OM: Constructed"
+            },
+            {
+                id: 26,
+                phase: 5,
+                title: "JavaScript Execution",
+                description: "JavaScript code executed with security policies",
+                technical: "V8 engine executes JavaScript within security sandbox",
+                security: "warning",
+                details: "JavaScript execution is controlled by CSP and browser security policies.",
+                code: "JS Files: 12\nExecution Time: 45ms\nCSP Violations: 0"
+            },
+            {
+                id: 27,
+                phase: 5,
+                title: "Resource Loading",
+                description: "Additional resources loaded with security checks",
+                technical: "Images, fonts, and other assets loaded via secure connections",
+                security: "secure",
+                details: "All resources loaded over HTTPS with integrity checks.",
+                code: "Resources: 24\nIntegrity Checks: Passed\nMixed Content: None"
+            },
+            {
+                id: 28,
+                phase: 5,
+                title: "Page Rendering Complete",
+                description: "Secure page fully rendered and interactive",
+                technical: "Complete page rendered with all security protections active",
+                security: "secure",
+                details: "Page is now secure, functional, and ready for user interaction.",
+                code: "Render Time: 1.2s\nSecurity Score: A+\nThreats Blocked: 0"
+            }
+        ];
+
+        const phases = {
+            1: "Phase 1: Initial Request",
+            2: "Phase 2: Connection Establishment",
+            3: "Phase 3: Security Protocols",
+            4: "Phase 4: HTTP Communication",
+            5: "Phase 5: Page Rendering"
+        };
+
+        // Application State
+        let currentStep = 0;
+        let isPlaying = false;
+        let isPaused = false;
+        let animationSpeed = 1;
+        let autoMode = true;
+        let animationTimer = null;
+
+        // DOM Elements
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const autoModeCheckbox = document.getElementById('auto-mode');
+        const speedButtons = document.querySelectorAll('.speed-btn');
+        const stepInfo = document.getElementById('step-info');
+        const progressFill = document.getElementById('progress-fill');
+        const stepTimeline = document.getElementById('step-timeline');
+        const phaseIndicator = document.getElementById('phase-indicator');
+        const packet = document.getElementById('packet');
+        const overlay = document.getElementById('overlay');
+        const certificatePopup = document.getElementById('certificate-popup');
+        const closePopup = document.getElementById('close-popup');
+
+        // Initialize Application
+        function init() {
+            createStepTimeline();
+            updateDisplay();
+            bindEvents();
+        }
+
+        // Create step timeline dots
+        function createStepTimeline() {
+            stepTimeline.innerHTML = '';
+            communicationSteps.forEach((step, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'step-dot';
+                dot.title = `Step ${step.id}: ${step.title}`;
+                dot.addEventListener('click', () => jumpToStep(index));
+                stepTimeline.appendChild(dot);
+            });
+        }
+
+        // Bind event listeners
+        function bindEvents() {
+            startBtn.addEventListener('click', startDemo);
+            pauseBtn.addEventListener('click', pauseDemo);
+            resetBtn.addEventListener('click', resetDemo);
+            prevBtn.addEventListener('click', previousStep);
+            nextBtn.addEventListener('click', nextStep);
+            autoModeCheckbox.addEventListener('change', toggleAutoMode);
+            
+            speedButtons.forEach(btn => {
+                btn.addEventListener('click', () => setSpeed(parseFloat(btn.dataset.speed)));
+            });
+
+            closePopup.addEventListener('click', closePopupDialog);
+            overlay.addEventListener('click', closePopupDialog);
+
+            // Keyboard navigation
+            document.addEventListener('keydown', handleKeyboard);
+        }
+
+        // Handle keyboard navigation
+        function handleKeyboard(e) {
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    if (isPlaying) pauseDemo();
+                    else startDemo();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    previousStep();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    nextStep();
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    closePopupDialog();
+                    break;
+                case 'r':
+                    e.preventDefault();
+                    resetDemo();
+                    break;
+            }
+        }
+
+        // Start demonstration
+        function startDemo() {
+            isPlaying = true;
+            isPaused = false;
+            updateControlButtons();
+            
+            if (autoMode) {
+                scheduleNextStep();
+            }
+        }
+
+        // Pause demonstration
+        function pauseDemo() {
+            isPlaying = false;
+            isPaused = true;
+            clearTimeout(animationTimer);
+            updateControlButtons();
+        }
+
+        // Reset demonstration
+        function resetDemo() {
+            isPlaying = false;
+            isPaused = false;
+            currentStep = 0;
+            clearTimeout(animationTimer);
+            updateDisplay();
+            updateControlButtons();
+        }
+
+        // Navigate to previous step
+        function previousStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                updateDisplay();
+                animatePacket();
+            }
+        }
+
+        // Navigate to next step
+        function nextStep() {
+            if (currentStep < communicationSteps.length - 1) {
+                currentStep++;
+                updateDisplay();
+                animatePacket();
+                
+                if (autoMode && isPlaying) {
+                    scheduleNextStep();
+                }
+            } else if (isPlaying) {
+                // End of demo
+                isPlaying = false;
+                updateControlButtons();
+            }
+        }
+
+        // Jump to specific step
+        function jumpToStep(stepIndex) {
+            currentStep = stepIndex;
+            updateDisplay();
+            animatePacket();
+        }
+
+        // Schedule next step based on speed
+        function scheduleNextStep() {
+            if (isPlaying && autoMode && currentStep < communicationSteps.length - 1) {
+                const delay = 3000 / animationSpeed; // Base delay of 3 seconds
+                animationTimer = setTimeout(() => {
+                    if (isPlaying) {
+                        nextStep();
+                    }
+                }, delay);
+            }
+        }
+
+        // Toggle auto mode
+        function toggleAutoMode() {
+            autoMode = autoModeCheckbox.checked;
+            if (autoMode && isPlaying && currentStep < communicationSteps.length - 1) {
+                scheduleNextStep();
+            } else {
+                clearTimeout(animationTimer);
+            }
+        }
+
+        // Set animation speed
+        function setSpeed(speed) {
+            animationSpeed = speed;
+            speedButtons.forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-speed="${speed}"]`).classList.add('active');
+            
+            // Restart timer with new speed if playing
+            if (isPlaying && autoMode) {
+                clearTimeout(animationTimer);
+                scheduleNextStep();
+            }
+        }
+
+        // Update control button states
+        function updateControlButtons() {
+            startBtn.disabled = isPlaying;
+            pauseBtn.disabled = !isPlaying;
+            prevBtn.disabled = currentStep === 0;
+            nextBtn.disabled = currentStep === communicationSteps.length - 1;
+            
+            startBtn.textContent = isPaused ? '▶️ Resume' : '▶️ Start Demo';
+        }
+
+        // Animate packet movement
+        function animatePacket() {
+            packet.classList.remove('moving');
+            packet.style.opacity = '0';
+            
+            setTimeout(() => {
+                const step = communicationSteps[currentStep];
+                
+                // Set packet content based on step
+                if (step.phase <= 2) {
+                    packet.textContent = '🔑'; // Security handshake
+                } else if (step.phase === 3) {
+                    packet.textContent = '🛡️'; // Security protocols
+                } else if (step.phase === 4) {
+                    packet.textContent = '📦'; // Data transfer
+                } else {
+                    packet.textContent = '🎨'; // Rendering
+                }
+                
+                packet.classList.add('moving');
+            }, 100);
+        }
+
+        // Update all display elements
+        function updateDisplay() {
+            const step = communicationSteps[currentStep];
+            updateStepInfo(step);
+            updateProgress();
+            updateTimeline();
+            updatePhaseIndicator(step.phase);
+        }
+
+        // Update step information panel
+        function updateStepInfo(step) {
+            const securityClass = step.security;
+            const securityIcon = {
+                'secure': '🔒',
+                'warning': '⚠️',
+                'danger': '🚨'
+            }[securityClass];
+
+            const securityText = {
+                'secure': 'Secure',
+                'warning': 'Caution Required',
+                'danger': 'Security Risk'
+            }[securityClass];
+
+            stepInfo.innerHTML = `
+                <h3>Step ${step.id}: ${step.title}</h3>
+                <div class="step-content">
+                    <div class="step-details">
+                        <h4>Description</h4>
+                        <p>${step.description}</p>
+                        
+                        <div class="security-indicator ${securityClass}">
+                            <span>${securityIcon} ${securityText}</span>
+                        </div>
+                        
+                        <h4>Technical Details</h4>
+                        <p>${step.technical}</p>
+                        
+                        <h4>Security Implications</h4>
+                        <p>${step.details}</p>
+                    </div>
+                    
+                    <div class="technical-details">
+                        <h4>Code Example</h4>
+                        <div class="code-block" ${step.popup ? `style="cursor: pointer;" onclick="showPopup('${step.popup}')"` : ''}>${step.code}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const progress = ((currentStep + 1) / communicationSteps.length) * 100;
+            progressFill.style.width = `${progress}%`;
+        }
+
+        // Update timeline dots
+        function updateTimeline() {
+            const dots = stepTimeline.querySelectorAll('.step-dot');
+            dots.forEach((dot, index) => {
+                dot.className = 'step-dot';
+                if (index < currentStep) {
+                    dot.classList.add('completed');
+                } else if (index === currentStep) {
+                    dot.classList.add('current');
+                }
+            });
+        }
+
+        // Update phase indicator
+        function updatePhaseIndicator(phase) {
+            phaseIndicator.textContent = phases[phase];
+            phaseIndicator.className = `phase-badge phase-${phase}`;
+        }
+
+        // Show popup dialog
+        function showPopup(type) {
+            if (type === 'certificate') {
+                overlay.classList.add('show');
+                certificatePopup.classList.add('show');
+            }
+        }
+
+        // Close popup dialog
+        function closePopupDialog() {
+            overlay.classList.remove('show');
+            certificatePopup.classList.remove('show');
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
